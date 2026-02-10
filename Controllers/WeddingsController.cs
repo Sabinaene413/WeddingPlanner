@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using WeddingPlanner.Api.Data;
 using WeddingPlanner.Api.Dtos.Weddings;
 using WeddingPlanner.Api.Dtos.WeddingTasks;
@@ -6,22 +7,29 @@ using WeddingPlanner.Api.Models;
 
 namespace WeddingPlanner.Api.Controllers
 {
+
     [ApiController]
     [Route("api/[controller]")]
     public class WeddingsController : ControllerBase
     {
+        private readonly WeddingPlannerContext _context;
+
+        public WeddingsController(WeddingPlannerContext context)
+        {
+            _context = context;
+        }
 
         // GET /api/weddings
         [HttpGet]
-        public IActionResult GetAll()
+        public async Task<IActionResult> GetAll()
         {
-            var weddingDtos = InMemoryData.Weddings.Select(w => new WeddingReadDto
+            var weddingDtos = await _context.Weddings.Select(w => new WeddingReadDto
             {
                 Id = w.Id,
                 Title = w.Title,
                 Date = w.Date,
                 Location = w.Location,
-                Tasks = InMemoryData.WeddingTasks
+                Tasks = _context.WeddingTasks
                 .Where(t => t.WeddingId == w.Id)
                 .Select(t => new WeddingTaskReadDto
                 {
@@ -29,16 +37,16 @@ namespace WeddingPlanner.Api.Controllers
                     Title = t.Title,
                     IsCompleted = t.IsCompleted
                 }).ToList()
-            }).ToList();
+            }).ToListAsync();
 
             return Ok(weddingDtos);
         }
 
         // GET /api/weddings/{id}
         [HttpGet("{id}")]
-        public IActionResult GetById(int id)
+        public async Task<IActionResult> GetById(int id)
         {
-            var wedding = InMemoryData.Weddings.FirstOrDefault(w => w.Id == id);
+            var wedding = await _context.Weddings.FirstOrDefaultAsync(w => w.Id == id);
             if (wedding == null) return NotFound();
 
             var dto = new WeddingReadDto
@@ -47,48 +55,48 @@ namespace WeddingPlanner.Api.Controllers
                 Title = wedding.Title,
                 Date = wedding.Date,
                 Location = wedding.Location,
-                Tasks = InMemoryData.WeddingTasks
+                Tasks = await _context.WeddingTasks
                 .Where(t => t.WeddingId == wedding.Id)
                 .Select(t => new WeddingTaskReadDto
                 {
                     Id = t.Id,
                     Title = t.Title,
                     IsCompleted = t.IsCompleted
-                }).ToList()
+                }).ToListAsync()
             };
             return Ok(dto);
         }
 
         // POST /api/weddings
         [HttpPost]
-        public IActionResult Create([FromBody] WeddingCreateDto dto)
+        public async Task<IActionResult> Create([FromBody] WeddingCreateDto dto)
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
             var wedding = new Wedding
             {
-                Id = InMemoryData.NextWeddingId(),
                 Title = dto.Title,
                 Date = dto.Date,
                 Location = dto.Location,
             };
 
-            InMemoryData.Weddings.Add(wedding);
+            await _context.Weddings.AddAsync(wedding);
+            await _context.SaveChangesAsync();
             return CreatedAtAction(nameof(GetById), new { id = wedding.Id }, wedding);
         }
 
         // GET /api/weddings/{id}/tasks
         [HttpGet("{id}/tasks")]
-        public IActionResult GetTasksForWedding(int id)
+        public async Task<IActionResult> GetTasksForWedding(int id)
         {
-            var wedding = InMemoryData.Weddings.FirstOrDefault(w => w.Id == id);
+            var wedding = await _context.Weddings.FirstOrDefaultAsync(w => w.Id == id);
             if (wedding == null)
                 return NotFound($"Wedding with id {id} not found.");
 
-            var tasks = InMemoryData.WeddingTasks
+            var tasks = await _context.WeddingTasks
                 .Where(t => t.WeddingId == id)
-                .ToList();
+                .ToListAsync();
 
             return Ok(tasks);
         }
