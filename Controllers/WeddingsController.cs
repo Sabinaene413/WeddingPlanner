@@ -23,21 +23,22 @@ namespace WeddingPlanner.Api.Controllers
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
-            var weddingDtos = await _context.Weddings.Select(w => new WeddingReadDto
-            {
-                Id = w.Id,
-                Title = w.Title,
-                Date = w.Date,
-                Location = w.Location,
-                Tasks = _context.WeddingTasks
-                .Where(t => t.WeddingId == w.Id)
-                .Select(t => new WeddingTaskReadDto
+            var weddingDtos = await _context.Weddings
+                .AsNoTracking()
+                .Select(w => new WeddingReadDto
                 {
-                    Id = t.Id,
-                    Title = t.Title,
-                    IsCompleted = t.IsCompleted
-                }).ToList()
-            }).ToListAsync();
+                    Id = w.Id,
+                    Title = w.Title,
+                    Date = w.Date,
+                    Location = w.Location,
+                    Tasks = w.Tasks.Select(t => new WeddingTaskReadDto
+                    {
+                        Id = t.Id,
+                        Title = t.Title,
+                        IsCompleted = t.IsCompleted
+                    }).ToList()
+                })
+                .ToListAsync();
 
             return Ok(weddingDtos);
         }
@@ -46,25 +47,28 @@ namespace WeddingPlanner.Api.Controllers
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
-            var wedding = await _context.Weddings.FirstOrDefaultAsync(w => w.Id == id);
-            if (wedding == null) return NotFound();
-
-            var dto = new WeddingReadDto
-            {
-                Id = wedding.Id,
-                Title = wedding.Title,
-                Date = wedding.Date,
-                Location = wedding.Location,
-                Tasks = await _context.WeddingTasks
-                .Where(t => t.WeddingId == wedding.Id)
-                .Select(t => new WeddingTaskReadDto
+            var wedding = await _context.Weddings
+                .AsNoTracking()
+                .Where(w => w.Id == id)
+                .Select(w => new WeddingReadDto
                 {
-                    Id = t.Id,
-                    Title = t.Title,
-                    IsCompleted = t.IsCompleted
-                }).ToListAsync()
-            };
-            return Ok(dto);
+                    Id = w.Id,
+                    Title = w.Title,
+                    Date = w.Date,
+                    Location = w.Location,
+                    Tasks = w.Tasks.Select(t => new WeddingTaskReadDto
+                    {
+                        Id = t.Id,
+                        Title = t.Title,
+                        IsCompleted = t.IsCompleted
+                    }).ToList()
+                })
+                .FirstOrDefaultAsync();
+
+            if (wedding == null)
+                return NotFound();
+
+            return Ok(wedding);
         }
 
         // POST /api/weddings

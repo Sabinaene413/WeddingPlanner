@@ -4,12 +4,12 @@ namespace WeddingPlanner.Api.Dtos.Weddings
 {
     public class WeddingReadDto
     {
-        public int Id { get; set; }             // Id-ul generat intern
+        public int Id { get; set; }             
         public string Title { get; set; }
         public DateTime Date { get; set; }
         public string Location { get; set; }
 
-        // Optional: lista taskurilor
+        // lista taskurilor
         public List<WeddingTaskReadDto> Tasks { get; set; } = new();
     }
 }

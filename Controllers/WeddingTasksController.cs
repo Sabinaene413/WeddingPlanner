@@ -1,8 +1,10 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Linq;
 using WeddingPlanner.Api.Data;
 using WeddingPlanner.Api.Dtos.WeddingTasks;
 using WeddingPlanner.Api.Models;
+using WeddingPlanner.Api.Models.Enums;
 
 namespace WeddingPlanner.Api.Controllers
 {
@@ -22,7 +24,7 @@ namespace WeddingPlanner.Api.Controllers
             [FromQuery] bool? completed,
             [FromQuery] int? weddingId)
         {
-            var tasks = _context.WeddingTasks.AsQueryable();
+            var tasks = _context.WeddingTasks.AsNoTracking();
 
             if (completed.HasValue)
             {
@@ -35,13 +37,8 @@ namespace WeddingPlanner.Api.Controllers
             }
 
             var dtos = await tasks
-                       .Select(t => new WeddingTaskReadDto
-                        {
-                            Id = t.Id,
-                            Title = t.Title,
-                            IsCompleted = t.IsCompleted
-                        })
-                       .ToListAsync();
+                .Select(t=> MapToReadDto(t))
+                .ToListAsync();
 
             return Ok(dtos);
         }
@@ -52,12 +49,7 @@ namespace WeddingPlanner.Api.Controllers
         {
             var dtos = await _context.WeddingTasks
                 .Where(t => t.WeddingId == weddingId)
-                .Select(t => new WeddingTaskReadDto
-                {
-                     Id = t.Id,
-                     Title = t.Title,
-                     IsCompleted = t.IsCompleted
-                })
+                .Select(t => MapToReadDto(t))
                 .ToListAsync();
 
             return Ok(dtos);
@@ -94,6 +86,7 @@ namespace WeddingPlanner.Api.Controllers
 
             _context.WeddingTasks.Add(task);
             await _context.SaveChangesAsync();
+            await UpdateWeddingStatus(task.WeddingId);
 
             return
               CreatedAtAction(
@@ -123,9 +116,11 @@ namespace WeddingPlanner.Api.Controllers
                 IsCompleted = task.IsCompleted
             };
             await _context.SaveChangesAsync();
+            await UpdateWeddingStatus(task.WeddingId);
 
             return Ok(readDto);
         }
+
 
         // DELETE /api/weddingtasks/{id}
         [HttpDelete("{id}")]
@@ -150,6 +145,31 @@ namespace WeddingPlanner.Api.Controllers
                 Title = task.Title,
                 IsCompleted = task.IsCompleted
             };
+        }
+
+        private async Task UpdateWeddingStatus(int weddingId)
+        {
+            var wedding = await _context.Weddings
+                .Include(w => w.Tasks)
+                .FirstOrDefaultAsync(w => w.Id == weddingId);
+
+            if (wedding == null)
+                return;
+
+            if (!wedding.Tasks.Any())
+            {
+                wedding.Status = WeddingStatus.Planned;
+            }
+            else if (wedding.Tasks.All(t => t.IsCompleted))
+            {
+                wedding.Status = WeddingStatus.Completed;
+            }
+            else
+            {
+                wedding.Status = WeddingStatus.InProgress;
+            }
+
+            await _context.SaveChangesAsync();
         }
 
     }
