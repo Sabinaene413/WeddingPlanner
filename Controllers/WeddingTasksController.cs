@@ -131,8 +131,12 @@ namespace WeddingPlanner.Api.Controllers
             if (task == null)
                 return NotFound();
 
+            var weddingId = task.WeddingId;
+
             _context.WeddingTasks.Remove(task);
             await _context.SaveChangesAsync();
+
+            await UpdateWeddingStatus(weddingId);
 
             return NoContent();
         }

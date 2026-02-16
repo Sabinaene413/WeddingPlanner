@@ -31,6 +31,7 @@ namespace WeddingPlanner.Api.Controllers
                     Title = w.Title,
                     Date = w.Date,
                     Location = w.Location,
+                    Status = w.Status.ToString(),
                     Tasks = w.Tasks.Select(t => new WeddingTaskReadDto
                     {
                         Id = t.Id,
