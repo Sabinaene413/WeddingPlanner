@@ -141,6 +141,7 @@ namespace WeddingPlanner.Api.Controllers
             return NoContent();
         }
 
+
         private static WeddingTaskReadDto MapToReadDto(WeddingTask task)
         {
             return new WeddingTaskReadDto
@@ -163,10 +164,6 @@ namespace WeddingPlanner.Api.Controllers
             if (!wedding.Tasks.Any())
             {
                 wedding.Status = WeddingStatus.Planned;
-            }
-            else if (wedding.Tasks.All(t => t.IsCompleted))
-            {
-                wedding.Status = WeddingStatus.Completed;
             }
             else
             {

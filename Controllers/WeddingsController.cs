@@ -4,6 +4,7 @@ using WeddingPlanner.Api.Data;
 using WeddingPlanner.Api.Dtos.Weddings;
 using WeddingPlanner.Api.Dtos.WeddingTasks;
 using WeddingPlanner.Api.Models;
+using WeddingPlanner.Api.Models.Enums;
 
 namespace WeddingPlanner.Api.Controllers
 {
@@ -57,6 +58,7 @@ namespace WeddingPlanner.Api.Controllers
                     Title = w.Title,
                     Date = w.Date,
                     Location = w.Location,
+                    Status = w.Status.ToString(),
                     Tasks = w.Tasks.Select(t => new WeddingTaskReadDto
                     {
                         Id = t.Id,
@@ -104,6 +106,65 @@ namespace WeddingPlanner.Api.Controllers
                 .ToListAsync();
 
             return Ok(tasks);
+        }
+
+        // PUT /api/weddings/{id}
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Update(int id, [FromBody] WeddingCreateDto dto)
+        {
+            var wedding = await _context.Weddings.FindAsync(id);
+            if (wedding == null)
+                return NotFound();
+
+            wedding.Title = dto.Title;
+            wedding.Date = dto.Date;
+            wedding.Location = dto.Location;
+
+            await _context.SaveChangesAsync();
+
+            return NoContent();
+        }
+
+        [HttpPut("{id}/complete")]
+        public async Task<IActionResult> MarkAsCompleted(int id)
+        {
+            var wedding = await _context.Weddings
+                .Include(w => w.Tasks)
+                .FirstOrDefaultAsync(w => w.Id == id);
+
+            if (wedding == null)
+                return NotFound();
+
+            if (!wedding.Tasks.Any())
+                return BadRequest("Cannot complete a wedding without tasks.");
+
+            if (!wedding.Tasks.All(t => t.IsCompleted))
+                return BadRequest("All tasks must be completed before marking the wedding as completed.");
+
+            wedding.Status = WeddingStatus.Completed;
+            await _context.SaveChangesAsync();
+
+            return Ok();
+        }
+
+        // DELETE /api/weddings/{id}
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> Delete(int id)
+        {
+            var wedding = await _context.Weddings
+                .Include(w => w.Tasks)
+                .FirstOrDefaultAsync(w => w.Id == id);
+
+            if (wedding == null)
+                return NotFound();
+
+            if (wedding.Tasks.Any())
+                return BadRequest("Cannot delete wedding with existing tasks.");
+
+            _context.Weddings.Remove(wedding);
+            await _context.SaveChangesAsync();
+
+            return NoContent();
         }
     }
 }
