@@ -9,6 +9,7 @@ namespace WeddingPlanner.Api.Models
         public DateTime Date { get; set; }
         public string Location { get; set; } = string.Empty;
         public WeddingStatus Status { get; set; } = WeddingStatus.Planned;
+        public bool IsArchived { get; set; } = false;
 
 
         // relatia cu taskurile

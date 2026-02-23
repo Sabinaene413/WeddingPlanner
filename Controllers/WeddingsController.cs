@@ -22,10 +22,18 @@ namespace WeddingPlanner.Api.Controllers
 
         // GET /api/weddings
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll(
+            [FromQuery] bool? archived)
         {
-            var weddingDtos = await _context.Weddings
-                .AsNoTracking()
+            var weddings =  _context.Weddings.AsNoTracking();
+
+            if(archived.HasValue)
+            {
+                weddings = weddings.Where(w => w.IsArchived == archived.Value);
+            }
+
+
+            var weddingDtos = await weddings
                 .Select(w => new WeddingReadDto
                 {
                     Id = w.Id,
@@ -33,6 +41,7 @@ namespace WeddingPlanner.Api.Controllers
                     Date = w.Date,
                     Location = w.Location,
                     Status = w.Status.ToString(),
+                    IsArchived = w.IsArchived,
                     Tasks = w.Tasks.Select(t => new WeddingTaskReadDto
                     {
                         Id = t.Id,
@@ -59,6 +68,7 @@ namespace WeddingPlanner.Api.Controllers
                     Date = w.Date,
                     Location = w.Location,
                     Status = w.Status.ToString(),
+                    IsArchived = w.IsArchived,
                     Tasks = w.Tasks.Select(t => new WeddingTaskReadDto
                     {
                         Id = t.Id,
@@ -162,6 +172,29 @@ namespace WeddingPlanner.Api.Controllers
                 return BadRequest("Cannot delete wedding with existing tasks.");
 
             _context.Weddings.Remove(wedding);
+            await _context.SaveChangesAsync();
+
+            return NoContent();
+        }
+
+        // PUT /api/weddings/{id}/archive
+        [HttpPut("{id}/archive")]
+        public async Task<IActionResult> SetArchiveState(int id,
+            [FromBody] WeddingArchiveDto dto)
+        {
+            var wedding = await _context.Weddings
+                         .FirstOrDefaultAsync(w => w.Id == id);
+
+            if (wedding == null)
+                return NotFound();
+
+            if (dto.IsArchived && wedding.Status != WeddingStatus.Completed)
+            {
+                return BadRequest("Only completed weddings can be archived.");
+            }
+
+            wedding.IsArchived = dto.IsArchived;
+
             await _context.SaveChangesAsync();
 
             return NoContent();
