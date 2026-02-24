@@ -10,9 +10,15 @@ namespace WeddingPlanner.Api.Models
         public string Location { get; set; } = string.Empty;
         public WeddingStatus Status { get; set; } = WeddingStatus.Planned;
         public bool IsArchived { get; set; } = false;
+        public bool IsSelfManaged { get; set; } = false;
 
 
         // relatia cu taskurile
         public List<WeddingTask> Tasks { get; set; }
+
+        // Owner
+        public int OwnerId { get; set; }       // cheia străină
+        public User Owner { get; set; }
+
     }
 }

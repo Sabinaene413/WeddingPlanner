@@ -10,6 +10,8 @@ namespace WeddingPlanner.Api.Dtos.Weddings
         public string Location { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public bool IsArchived { get; set; }
+        public int OwnerId { get; set; }
+        public bool IsSelfManaged { get; set; }
 
         // lista taskurilor
         public List<WeddingTaskReadDto> Tasks { get; set; } = new();

@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using WeddingPlanner.Api.Data;
 
@@ -10,9 +11,11 @@ using WeddingPlanner.Api.Data;
 namespace WeddingPlanner.Api.Migrations
 {
     [DbContext(typeof(WeddingPlannerContext))]
-    partial class WeddingPlannerContextModelSnapshot : ModelSnapshot
+    [Migration("20260223091745_AddUsers")]
+    partial class AddUsers
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.0");
@@ -55,15 +58,9 @@ namespace WeddingPlanner.Api.Migrations
                     b.Property<bool>("IsArchived")
                         .HasColumnType("INTEGER");
 
-                    b.Property<bool>("IsSelfManaged")
-                        .HasColumnType("INTEGER");
-
                     b.Property<string>("Location")
                         .IsRequired()
                         .HasColumnType("TEXT");
-
-                    b.Property<int>("OwnerId")
-                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Status")
                         .HasColumnType("INTEGER");
@@ -73,8 +70,6 @@ namespace WeddingPlanner.Api.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("OwnerId");
 
                     b.ToTable("Weddings");
                 });
@@ -102,17 +97,6 @@ namespace WeddingPlanner.Api.Migrations
                     b.ToTable("WeddingTasks");
                 });
 
-            modelBuilder.Entity("WeddingPlanner.Api.Models.Wedding", b =>
-                {
-                    b.HasOne("WeddingPlanner.Api.Models.User", "Owner")
-                        .WithMany("Weddings")
-                        .HasForeignKey("OwnerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Owner");
-                });
-
             modelBuilder.Entity("WeddingPlanner.Api.Models.WeddingTask", b =>
                 {
                     b.HasOne("WeddingPlanner.Api.Models.Wedding", "Wedding")
@@ -122,11 +106,6 @@ namespace WeddingPlanner.Api.Migrations
                         .IsRequired();
 
                     b.Navigation("Wedding");
-                });
-
-            modelBuilder.Entity("WeddingPlanner.Api.Models.User", b =>
-                {
-                    b.Navigation("Weddings");
                 });
 
             modelBuilder.Entity("WeddingPlanner.Api.Models.Wedding", b =>

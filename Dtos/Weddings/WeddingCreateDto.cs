@@ -8,5 +8,6 @@ namespace WeddingPlanner.Api.Dtos.Weddings
         public string Title { get; set; }
         public DateTime Date { get; set; }
         public string Location { get; set; }
+        public bool IsSelfManaged { get; set; }
     }
 }

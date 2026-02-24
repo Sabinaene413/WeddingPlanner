@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using WeddingPlanner.Api.Data;
 
@@ -10,9 +11,11 @@ using WeddingPlanner.Api.Data;
 namespace WeddingPlanner.Api.Migrations
 {
     [DbContext(typeof(WeddingPlannerContext))]
-    partial class WeddingPlannerContextModelSnapshot : ModelSnapshot
+    [Migration("20260223092159_AddWeddingOwnerRelation")]
+    partial class AddWeddingOwnerRelation
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.0");
@@ -53,9 +56,6 @@ namespace WeddingPlanner.Api.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("IsArchived")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<bool>("IsSelfManaged")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Location")

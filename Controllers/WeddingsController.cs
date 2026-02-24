@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using WeddingPlanner.Api.Data;
 using WeddingPlanner.Api.Dtos.Weddings;
 using WeddingPlanner.Api.Dtos.WeddingTasks;
+using WeddingPlanner.Api.Infrastructure.Auth;
 using WeddingPlanner.Api.Models;
 using WeddingPlanner.Api.Models.Enums;
 
@@ -69,6 +70,7 @@ namespace WeddingPlanner.Api.Controllers
                     Location = w.Location,
                     Status = w.Status.ToString(),
                     IsArchived = w.IsArchived,
+                    OwnerId = w.OwnerId,
                     Tasks = w.Tasks.Select(t => new WeddingTaskReadDto
                     {
                         Id = t.Id,
@@ -91,15 +93,30 @@ namespace WeddingPlanner.Api.Controllers
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
+            var user = HttpContext.GetCurrentUser();
+
+            if (user.Role == UserRole.BrideGroom && !dto.IsSelfManaged)
+                return Forbid();
+
+            if (user.Role != UserRole.BrideGroom &&
+                user.Role != UserRole.Organizer &&
+                user.Role != UserRole.Admin)
+                return Forbid();
+
             var wedding = new Wedding
             {
                 Title = dto.Title,
                 Date = dto.Date,
                 Location = dto.Location,
+                OwnerId = user.Id,
+                IsSelfManaged = dto.IsSelfManaged,
+                Status = WeddingStatus.Planned,
+                IsArchived = false
             };
 
             await _context.Weddings.AddAsync(wedding);
             await _context.SaveChangesAsync();
+
             return CreatedAtAction(nameof(GetById), new { id = wedding.Id }, wedding);
         }
 
@@ -120,11 +137,32 @@ namespace WeddingPlanner.Api.Controllers
 
         // PUT /api/weddings/{id}
         [HttpPut("{id}")]
-        public async Task<IActionResult> Update(int id, [FromBody] WeddingCreateDto dto)
+        public async Task<IActionResult> Update(int id, [FromBody] WeddingUpdateDto dto)
         {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            var user = HttpContext.GetCurrentUser();
+
             var wedding = await _context.Weddings.FindAsync(id);
             if (wedding == null)
                 return NotFound();
+
+            if (wedding.Status == WeddingStatus.Completed ||
+                wedding.Status == WeddingStatus.Cancelled)
+            {
+                return BadRequest("Wedding cannot be modified in current state.");
+            }
+
+            var canEdit =
+                  user.Role == UserRole.Admin ||
+                  user.Role == UserRole.Organizer ||
+                 (user.Role == UserRole.BrideGroom &&
+                  wedding.OwnerId == user.Id &&
+                  wedding.IsSelfManaged);
+
+            if (!canEdit)
+                return Forbid();
 
             wedding.Title = dto.Title;
             wedding.Date = dto.Date;
@@ -138,12 +176,29 @@ namespace WeddingPlanner.Api.Controllers
         [HttpPut("{id}/complete")]
         public async Task<IActionResult> MarkAsCompleted(int id)
         {
+            var user = HttpContext.GetCurrentUser();
+
             var wedding = await _context.Weddings
                 .Include(w => w.Tasks)
                 .FirstOrDefaultAsync(w => w.Id == id);
 
             if (wedding == null)
                 return NotFound();
+
+            // 🔒 permisiuni
+            var canComplete =
+                user.Role == UserRole.Admin ||
+                user.Role == UserRole.Organizer ||
+                (user.Role == UserRole.BrideGroom &&
+                 wedding.OwnerId == user.Id &&
+                 wedding.IsSelfManaged);
+
+            if (!canComplete)
+                return Forbid();
+
+            // 🧠 business rules
+            if (wedding.Status == WeddingStatus.Completed)
+                return BadRequest("Wedding already completed.");
 
             if (!wedding.Tasks.Any())
                 return BadRequest("Cannot complete a wedding without tasks.");
@@ -161,6 +216,11 @@ namespace WeddingPlanner.Api.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
+            var user = HttpContext.GetCurrentUser();
+
+            if (user.Role != UserRole.Admin)
+                return Forbid();
+
             var wedding = await _context.Weddings
                 .Include(w => w.Tasks)
                 .FirstOrDefaultAsync(w => w.Id == id);
@@ -182,6 +242,11 @@ namespace WeddingPlanner.Api.Controllers
         public async Task<IActionResult> SetArchiveState(int id,
             [FromBody] WeddingArchiveDto dto)
         {
+            var user = HttpContext.GetCurrentUser();
+
+            if (user.Role != UserRole.Admin && user.Role != UserRole.Organizer)
+                return Forbid();
+
             var wedding = await _context.Weddings
                          .FirstOrDefaultAsync(w => w.Id == id);
 
