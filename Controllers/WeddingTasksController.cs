@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Linq;
 using WeddingPlanner.Api.Data;
 using WeddingPlanner.Api.Dtos.WeddingTasks;
+using WeddingPlanner.Api.Infrastructure.Auth;
 using WeddingPlanner.Api.Models;
 using WeddingPlanner.Api.Models.Enums;
 
@@ -73,9 +74,21 @@ namespace WeddingPlanner.Api.Controllers
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            var weddingExists = _context.Weddings.Any(w => w.Id == dto.WeddingId);
-            if (!weddingExists)
+            var user = HttpContext.GetCurrentUser();
+
+            var wedding = await _context.Weddings.FirstOrDefaultAsync(w => w.Id == dto.WeddingId);
+            if (wedding == null)
                 return BadRequest($"Wedding with id {dto.WeddingId} does not exist.");
+
+            var canCreate =
+                   user.Role == UserRole.Admin ||
+                   user.Role == UserRole.Organizer ||
+                  (user.Role == UserRole.BrideGroom &&
+                   wedding.OwnerId == user.Id &&
+                   wedding.IsSelfManaged);
+
+            if (!canCreate)
+                return StatusCode(403, "Access denied.");
 
             var task = new WeddingTask
             {
@@ -103,9 +116,25 @@ namespace WeddingPlanner.Api.Controllers
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            var task = await _context.WeddingTasks.FirstOrDefaultAsync(t => t.Id == id);
+            var user = HttpContext.GetCurrentUser();
+
+            var canToggle =
+                          user.Role == UserRole.Admin ||
+                          user.Role == UserRole.Organizer ||
+                          user.Role == UserRole.BrideGroom;
+
+            if (!canToggle)
+                return Forbid();
+
+            var task = await _context.WeddingTasks
+                .Include(t => t.Wedding)
+                .FirstOrDefaultAsync(t => t.Id == id);
             if (task == null)
                 return NotFound();
+
+
+            if (task.Wedding.Status == WeddingStatus.Completed)
+                return BadRequest("Cannot modify tasks of a completed wedding.");
 
             task.IsCompleted = dto.IsCompleted;
 
@@ -126,10 +155,24 @@ namespace WeddingPlanner.Api.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var task = await _context.WeddingTasks.FirstOrDefaultAsync(t =>
+            var user = HttpContext.GetCurrentUser();
+
+            var task = await _context.WeddingTasks
+                .Include(w => w.Wedding)
+                .FirstOrDefaultAsync(t =>
             t.Id == id);
             if (task == null)
                 return NotFound();
+
+            var canDelete =
+                  user.Role == UserRole.Admin ||
+                  user.Role == UserRole.Organizer ||
+                 (user.Role == UserRole.BrideGroom &&
+                  task.Wedding.OwnerId == user.Id &&
+                  task.Wedding.IsSelfManaged);
+
+            if (!canDelete)
+                return Forbid();
 
             var weddingId = task.WeddingId;
 
