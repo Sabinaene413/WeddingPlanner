@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WeddingPlanner.Api.Data;
 using WeddingPlanner.Api.Dtos.Weddings;
@@ -6,19 +7,23 @@ using WeddingPlanner.Api.Dtos.WeddingTasks;
 using WeddingPlanner.Api.Infrastructure.Auth;
 using WeddingPlanner.Api.Models;
 using WeddingPlanner.Api.Models.Enums;
+using WeddingPlanner.Api.Services.Permissions;
 
 namespace WeddingPlanner.Api.Controllers
 {
-
+    [Authorize]
     [ApiController]
     [Route("api/[controller]")]
     public class WeddingsController : ControllerBase
     {
         private readonly WeddingPlannerContext _context;
+        private readonly IWeddingPermissionService _permissions;
 
-        public WeddingsController(WeddingPlannerContext context)
+        public WeddingsController(WeddingPlannerContext context,
+            IWeddingPermissionService permissions)
         {
             _context = context;
+            _permissions = permissions;
         }
 
         // GET /api/weddings
@@ -95,12 +100,7 @@ namespace WeddingPlanner.Api.Controllers
 
             var user = HttpContext.GetCurrentUser();
 
-            if (user.Role == UserRole.BrideGroom && !dto.IsSelfManaged)
-                return Forbid();
-
-            if (user.Role != UserRole.BrideGroom &&
-                user.Role != UserRole.Organizer &&
-                user.Role != UserRole.Admin)
+            if (!_permissions.CanCreateWedding(user, dto.IsSelfManaged))
                 return Forbid();
 
             var wedding = new Wedding
@@ -154,14 +154,7 @@ namespace WeddingPlanner.Api.Controllers
                 return BadRequest("Wedding cannot be modified in current state.");
             }
 
-            var canEdit =
-                  user.Role == UserRole.Admin ||
-                  user.Role == UserRole.Organizer ||
-                 (user.Role == UserRole.BrideGroom &&
-                  wedding.OwnerId == user.Id &&
-                  wedding.IsSelfManaged);
-
-            if (!canEdit)
+            if (!_permissions.CanEditWedding(user, wedding))
                 return Forbid();
 
             wedding.Title = dto.Title;
@@ -244,7 +237,7 @@ namespace WeddingPlanner.Api.Controllers
         {
             var user = HttpContext.GetCurrentUser();
 
-            if (user.Role != UserRole.Admin && user.Role != UserRole.Organizer)
+            if (!_permissions.CanArchiveWedding(user))
                 return Forbid();
 
             var wedding = await _context.Weddings

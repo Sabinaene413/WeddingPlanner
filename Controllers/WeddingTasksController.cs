@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Linq;
 using WeddingPlanner.Api.Data;
@@ -6,18 +7,23 @@ using WeddingPlanner.Api.Dtos.WeddingTasks;
 using WeddingPlanner.Api.Infrastructure.Auth;
 using WeddingPlanner.Api.Models;
 using WeddingPlanner.Api.Models.Enums;
+using WeddingPlanner.Api.Services.Permissions;
 
 namespace WeddingPlanner.Api.Controllers
 {
+    [Authorize]
     [ApiController]
     [Route("api/[controller]")]
     public class WeddingTasksController : ControllerBase
     {
         private readonly WeddingPlannerContext _context;
+        private readonly IWeddingPermissionService _permissions;
 
-        public WeddingTasksController(WeddingPlannerContext context)
+        public WeddingTasksController(WeddingPlannerContext context,
+               IWeddingPermissionService permissions)
         {
             _context = context;
+            _permissions = permissions;
         }
         // GET /api/weddingTasks
         [HttpGet]
@@ -80,15 +86,8 @@ namespace WeddingPlanner.Api.Controllers
             if (wedding == null)
                 return BadRequest($"Wedding with id {dto.WeddingId} does not exist.");
 
-            var canCreate =
-                   user.Role == UserRole.Admin ||
-                   user.Role == UserRole.Organizer ||
-                  (user.Role == UserRole.BrideGroom &&
-                   wedding.OwnerId == user.Id &&
-                   wedding.IsSelfManaged);
-
-            if (!canCreate)
-                return StatusCode(403, "Access denied.");
+            if (!_permissions.CanManageTasks(user, wedding))
+                return Forbid();
 
             var task = new WeddingTask
             {
@@ -118,12 +117,7 @@ namespace WeddingPlanner.Api.Controllers
 
             var user = HttpContext.GetCurrentUser();
 
-            var canToggle =
-                          user.Role == UserRole.Admin ||
-                          user.Role == UserRole.Organizer ||
-                          user.Role == UserRole.BrideGroom;
-
-            if (!canToggle)
+            if (!_permissions.CanToggleTask(user))
                 return Forbid();
 
             var task = await _context.WeddingTasks
@@ -164,14 +158,7 @@ namespace WeddingPlanner.Api.Controllers
             if (task == null)
                 return NotFound();
 
-            var canDelete =
-                  user.Role == UserRole.Admin ||
-                  user.Role == UserRole.Organizer ||
-                 (user.Role == UserRole.BrideGroom &&
-                  task.Wedding.OwnerId == user.Id &&
-                  task.Wedding.IsSelfManaged);
-
-            if (!canDelete)
+            if (!_permissions.CanManageTasks(user, task.Wedding))
                 return Forbid();
 
             var weddingId = task.WeddingId;

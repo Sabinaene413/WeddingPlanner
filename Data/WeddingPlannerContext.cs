@@ -2,6 +2,7 @@
 using WeddingPlanner.Api.Models;
 using WeddingPlanner.Api.Models.Enums;
 
+
 namespace WeddingPlanner.Api.Data
 {
     public class WeddingPlannerContext : DbContext
@@ -24,12 +25,6 @@ namespace WeddingPlanner.Api.Data
                 .WithOne(t => t.Wedding)
                 .HasForeignKey(t => t.WeddingId);
 
-            modelBuilder.Entity<User>().HasData(new User
-            {
-                Id = 1,           
-                Name = "Admin",
-                Role = UserRole.Admin
-            });
         }
     }
 }
