@@ -7,6 +7,7 @@ using System.Security.Claims;
 using System.Text;
 using System.Text.Json.Serialization;
 using WeddingPlanner.Api.Data;
+using WeddingPlanner.Api.Services.Auth;
 using WeddingPlanner.Api.Services.Permissions;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -51,6 +52,7 @@ builder.Services.AddDbContext<WeddingPlannerContext>(options =>
        options.UseSqlite("Data Source=weddingplanner.db"));
 
 builder.Services.AddScoped<IWeddingPermissionService, WeddingPermissionService>();
+builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>

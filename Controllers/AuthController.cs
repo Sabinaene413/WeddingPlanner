@@ -1,12 +1,10 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
 using WeddingPlanner.Api.Data;
+using WeddingPlanner.Api.Dtos.Auth;
 using WeddingPlanner.Api.Models;
 using WeddingPlanner.Api.Models.Enums;
+using WeddingPlanner.Api.Services.Auth;
 
 namespace WeddingPlanner.Api.Controllers
 {
@@ -15,11 +13,11 @@ namespace WeddingPlanner.Api.Controllers
     public class AuthController : ControllerBase
     {
         private readonly WeddingPlannerContext _context;
-        private readonly IConfiguration _config;
-        public AuthController(WeddingPlannerContext context, IConfiguration config)
+        private readonly IJwtTokenService _jwtService;
+        public AuthController(WeddingPlannerContext context, IJwtTokenService jwtService)
         {
             _context = context;
-            _config = config;
+            _jwtService = jwtService;
         }
 
         [HttpPost("register")]
@@ -53,36 +51,9 @@ namespace WeddingPlanner.Api.Controllers
             if (user == null || !BCrypt.Net.BCrypt.Verify(model.Password, user.PasswordHash))
                 return Unauthorized("Username sau parolă incorectă.");
 
-            var token = GenerateJwtToken(user);
+            var token = _jwtService.Generate(user);
             return Ok(new { token });
         }
 
-        private string GenerateJwtToken(User user)
-        {
-            var claims = new List<Claim>
-            {
-                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                new Claim(ClaimTypes.Name, user.Username),
-                new Claim(ClaimTypes.Role, user.Role.ToString())
-            };
-
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));
-            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-            var tokenDescriptor = new SecurityTokenDescriptor
-            {
-                Subject = new ClaimsIdentity(claims),
-                Expires = DateTime.Now.AddDays(7),
-                SigningCredentials = creds
-            };
-
-            var tokenHandler = new JwtSecurityTokenHandler();
-            var token = tokenHandler.CreateToken(tokenDescriptor);
-
-            return tokenHandler.WriteToken(token);
-        }
     }
-
-    public record RegisterDto(string Name, string Username, string Password, UserRole Role);
-    public record LoginDto(string Username, string Password);
 }
