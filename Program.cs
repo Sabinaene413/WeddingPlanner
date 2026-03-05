@@ -10,6 +10,8 @@ using System.Text.Json.Serialization;
 using WeddingPlanner.Api.Data;
 using WeddingPlanner.Api.Services.Auth;
 using WeddingPlanner.Api.Services.Permissions;
+using WeddingPlanner.Api.Services.Weddings;
+using WeddingPlanner.Api.Services.WeddingTasks;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -53,6 +55,8 @@ builder.Services.AddDbContext<WeddingPlannerContext>(options =>
        options.UseSqlite("Data Source=weddingplanner.db"));
 
 builder.Services.AddScoped<IWeddingPermissionService, WeddingPermissionService>();
+builder.Services.AddScoped<IWeddingService, WeddingService>();
+builder.Services.AddScoped<IWeddingTaskService, WeddingTaskService>();
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 
 JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();

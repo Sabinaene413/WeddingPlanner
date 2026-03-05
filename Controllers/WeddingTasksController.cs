@@ -1,13 +1,11 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using System.Linq;
-using WeddingPlanner.Api.Data;
 using WeddingPlanner.Api.Dtos.WeddingTasks;
 using WeddingPlanner.Api.Infrastructure.Auth;
-using WeddingPlanner.Api.Models;
 using WeddingPlanner.Api.Models.Enums;
 using WeddingPlanner.Api.Services.Permissions;
+using WeddingPlanner.Api.Services.Weddings;
+using WeddingPlanner.Api.Services.WeddingTasks;
 
 namespace WeddingPlanner.Api.Controllers
 {
@@ -16,61 +14,45 @@ namespace WeddingPlanner.Api.Controllers
     [Route("api/[controller]")]
     public class WeddingTasksController : ControllerBase
     {
-        private readonly WeddingPlannerContext _context;
+        private readonly IWeddingTaskService _taskService;
+        private readonly IWeddingService _weddingService;
         private readonly IWeddingPermissionService _permissions;
 
-        public WeddingTasksController(WeddingPlannerContext context,
+        public WeddingTasksController(IWeddingTaskService taskService,
+               IWeddingService weddingService,
                IWeddingPermissionService permissions)
         {
-            _context = context;
+            _taskService = taskService;
+            _weddingService = weddingService;
             _permissions = permissions;
         }
+
         // GET /api/weddingTasks
         [HttpGet]
         public async Task<IActionResult> GetAll(
             [FromQuery] bool? completed,
             [FromQuery] int? weddingId)
         {
-            var tasks = _context.WeddingTasks.AsNoTracking();
-
-            if (completed.HasValue)
-            {
-                tasks = tasks.Where(t => t.IsCompleted == completed.Value);
-            }
-
-            if (weddingId.HasValue)
-            {
-                tasks = tasks.Where(t => t.WeddingId == weddingId.Value);
-            }
-
-            var dtos = await tasks
-                .Select(t=> MapToReadDto(t))
-                .ToListAsync();
-
-            return Ok(dtos);
+            var tasks = await _taskService.GetAllAsync(completed, weddingId);
+            return Ok(tasks);
         }
 
         // GET /api/weddingTasks/wedding/{weddingId}
         [HttpGet("wedding/{weddingId}")]
         public async Task<IActionResult> GetByWedding(int weddingId)
         {
-            var dtos = await _context.WeddingTasks
-                .Where(t => t.WeddingId == weddingId)
-                .Select(t => MapToReadDto(t))
-                .ToListAsync();
-
-            return Ok(dtos);
+            var tasks = await _taskService.GetByWeddingIdAsync(weddingId);
+            return Ok(tasks);
         }
-
 
         // GET /api/weddingTasks/{id}
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
-            var task = await _context.WeddingTasks.FirstOrDefaultAsync(w => w.Id == id);
+            var task = await _taskService.GetByIdAsync(id);
             if (task == null) return NotFound();
 
-            return Ok(MapToReadDto(task));
+            return Ok(task);
         }
 
         // POST /api/weddingTasks
@@ -82,30 +64,16 @@ namespace WeddingPlanner.Api.Controllers
 
             var user = HttpContext.GetCurrentUser();
 
-            var wedding = await _context.Weddings.FirstOrDefaultAsync(w => w.Id == dto.WeddingId);
+            var wedding = await _weddingService.GetEntityByIdAsync(dto.WeddingId);
             if (wedding == null)
                 return BadRequest($"Wedding with id {dto.WeddingId} does not exist.");
 
             if (!_permissions.CanManageTasks(user, wedding))
                 return Forbid();
 
-            var task = new WeddingTask
-            {
-                Title = dto.Title,
-                WeddingId = dto.WeddingId,
-                IsCompleted = false
-            };
+            var task = await _taskService.CreateAsync(dto);
 
-            _context.WeddingTasks.Add(task);
-            await _context.SaveChangesAsync();
-            await UpdateWeddingStatus(task.WeddingId);
-
-            return
-              CreatedAtAction(
-                nameof(GetById),
-                new { id = task.Id },
-                MapToReadDto(task)
-              );
+            return CreatedAtAction(nameof(GetById), new { id = task.Id }, task);
         }
 
         // PUT /api/weddingtasks/{id}/complete
@@ -120,30 +88,19 @@ namespace WeddingPlanner.Api.Controllers
             if (!_permissions.CanToggleTask(user))
                 return Forbid();
 
-            var task = await _context.WeddingTasks
-                .Include(t => t.Wedding)
-                .FirstOrDefaultAsync(t => t.Id == id);
+            var task = await _taskService.GetEntityByIdAsync(id);
             if (task == null)
                 return NotFound();
-
 
             if (task.Wedding.Status == WeddingStatus.Completed)
                 return BadRequest("Cannot modify tasks of a completed wedding.");
 
-            task.IsCompleted = dto.IsCompleted;
+            await _taskService.UpdateCompletionAsync(task, dto.IsCompleted);
 
-            var readDto = new WeddingTaskReadDto
-            {
-                Id = task.Id,
-                Title = task.Title,
-                IsCompleted = task.IsCompleted
-            };
-            await _context.SaveChangesAsync();
-            await UpdateWeddingStatus(task.WeddingId);
+            var updatedTask = await _taskService.GetByIdAsync(id);
 
-            return Ok(readDto);
+            return Ok(updatedTask);
         }
-
 
         // DELETE /api/weddingtasks/{id}
         [HttpDelete("{id}")]
@@ -151,58 +108,16 @@ namespace WeddingPlanner.Api.Controllers
         {
             var user = HttpContext.GetCurrentUser();
 
-            var task = await _context.WeddingTasks
-                .Include(w => w.Wedding)
-                .FirstOrDefaultAsync(t =>
-            t.Id == id);
+            var task = await _taskService.GetEntityByIdAsync(id);
             if (task == null)
                 return NotFound();
 
             if (!_permissions.CanManageTasks(user, task.Wedding))
                 return Forbid();
 
-            var weddingId = task.WeddingId;
-
-            _context.WeddingTasks.Remove(task);
-            await _context.SaveChangesAsync();
-
-            await UpdateWeddingStatus(weddingId);
+            await _taskService.DeleteAsync(task);
 
             return NoContent();
         }
-
-
-        private static WeddingTaskReadDto MapToReadDto(WeddingTask task)
-        {
-            return new WeddingTaskReadDto
-            {
-                Id = task.Id,
-                Title = task.Title,
-                IsCompleted = task.IsCompleted
-            };
-        }
-
-        private async Task UpdateWeddingStatus(int weddingId)
-        {
-            var wedding = await _context.Weddings
-                .Include(w => w.Tasks)
-                .FirstOrDefaultAsync(w => w.Id == weddingId);
-
-            if (wedding == null)
-                return;
-
-            if (!wedding.Tasks.Any())
-            {
-                wedding.Status = WeddingStatus.Planned;
-            }
-            else
-            {
-                wedding.Status = WeddingStatus.InProgress;
-            }
-
-            await _context.SaveChangesAsync();
-        }
-
     }
-
 }
