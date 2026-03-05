@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Scalar.AspNetCore;
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json.Serialization;
@@ -54,6 +55,8 @@ builder.Services.AddDbContext<WeddingPlannerContext>(options =>
 builder.Services.AddScoped<IWeddingPermissionService, WeddingPermissionService>();
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 
+JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -66,8 +69,9 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             IssuerSigningKey = new SymmetricSecurityKey(
                 Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!)
             ),
-            RoleClaimType = ClaimTypes.Role,
-            NameClaimType = ClaimTypes.NameIdentifier
+            RoleClaimType = "role",
+            NameClaimType = "sub",
+
         };
     });
 
@@ -92,6 +96,8 @@ builder.Services.AddCors(options =>
             .AllowAnyMethod();
     });
 });
+
+
 
 var app = builder.Build();
 

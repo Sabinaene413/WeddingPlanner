@@ -91,6 +91,25 @@ namespace WeddingPlanner.Api.Controllers
             return Ok(wedding);
         }
 
+        // GET /api/my
+        [HttpGet("my")]
+        public async Task<IActionResult> GetMyWedding()
+        {
+            var user = HttpContext.GetCurrentUser();
+
+            if (user.Role != UserRole.BrideGroom)
+                return Forbid();
+
+            var wedding = await _context.Weddings
+                .Where(w => w.OwnerId == user.Id)
+                .FirstOrDefaultAsync();
+
+            if (wedding == null)
+                return Ok(null);
+
+            return Ok(wedding);
+        }
+
         // POST /api/weddings
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] WeddingCreateDto dto)

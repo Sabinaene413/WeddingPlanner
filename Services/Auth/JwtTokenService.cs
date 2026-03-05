@@ -19,8 +19,9 @@ namespace WeddingPlanner.Api.Services.Auth
         {
             var claims = new[]
             {
-            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new Claim(ClaimTypes.Role, user.Role.ToString())
+            new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+            new Claim(JwtRegisteredClaimNames.Name, user.Username),
+            new Claim("role", user.Role.ToString())
              };
 
             var key = new SymmetricSecurityKey(

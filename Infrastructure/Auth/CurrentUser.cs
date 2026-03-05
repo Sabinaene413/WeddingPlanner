@@ -2,5 +2,5 @@
 
 namespace WeddingPlanner.Api.Infrastructure.Auth
 {
-    public record CurrentUser(int Id, UserRole Role);
+    public record CurrentUser(int Id, string Name, UserRole Role);
 }

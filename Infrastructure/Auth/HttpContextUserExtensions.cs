@@ -18,11 +18,15 @@ namespace WeddingPlanner.Api.Infrastructure.Auth
             var roleClaim = user.FindFirst(ClaimTypes.Role)
                   ?? user.FindFirst("role");
 
+            var nameClaim = user.FindFirst(ClaimTypes.Name) ?? user.FindFirst("name") ??
+                user.FindFirst("unique_name");
+
             if (userIdClaim == null || roleClaim == null)
                 throw new UnauthorizedAccessException("Missing JWT claims.");
 
             return new CurrentUser(
                  int.Parse(userIdClaim.Value),
+                 nameClaim?.Value ?? "Unknown User",
                  Enum.Parse<UserRole>(roleClaim.Value)
                  );
         }
